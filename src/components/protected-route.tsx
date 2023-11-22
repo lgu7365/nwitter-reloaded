@@ -6,7 +6,6 @@ export default function ProtectedRoute({
 }: {
 	children: React.ReactNode;
 }) {
-
 	const user = auth.currentUser;
 	if(user === null){ // 비로그인
 		return <Navigate to="/login" />
