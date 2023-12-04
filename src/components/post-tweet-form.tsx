@@ -1,5 +1,8 @@
 import styled from "styled-components";
 import { useState } from "react"
+import { addDoc, collection, updateDoc } from "firebase/firestore";
+import { auth, db, storage } from "../firebase";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 const Form = styled.form`
   display: flex;
@@ -69,10 +72,41 @@ export default function PostTweetForm() {
       setFile(files[0]);
     }
   }
+  const onSubmit = async (e: React.ChangeEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if(!user || isLoading || tweet === "" || tweet.length > 180) return;
+    try {
+      setLoading(true);
+      const doc = await addDoc(collection(db, "tweets"), {
+        tweet,
+        createAt: Date.now(),
+        username: user.displayName || "Anonymous",
+        userId: user.uid
+      });
+      if(file) {
+        const locationRef = ref(
+          storage, 
+          `tweets/${user.uid}-${user.displayName}/${doc.id}`
+        );
+        const result = await uploadBytes(locationRef, file);
+        const url = await getDownloadURL(result.ref);
+        await updateDoc(doc, {
+          photo: url,
+        });
+        setTweet("");
+        setFile(null);
+      }
+    } catch(e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <Form>
-      <TextArea rows={5} maxLength={180} onChange={onChange} value={tweet} placeholder="What is happening" />
+    <Form onSubmit={onSubmit}>
+      <TextArea required rows={5} maxLength={180} onChange={onChange} value={tweet} placeholder="What is happening" />
       <AttachFileButton htmlFor="file" >{file ? "Photo added ✅":"Add photo"}</AttachFileButton>
       <AttachFileInput onChange={onFileChange} type="file" id="file" accept="image/*" />
       <SubmitBtn type="submit" value={isLoading ? "Posting..." : "Post Tweet"} />
